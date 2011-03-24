@@ -16,13 +16,11 @@ Running the webapp
 [SQLite3](http://www.sqlite.org/)
 (Debian: `apt-get install sqlite3`). 
 
-2. Compile with: `lein uberjar`
+2. Create an initial sqlite database: `mkdir data; sqlite3 data/db < clojars.sql`
 
-3. Create an initial sqlite database: `mkdir data; sqlite3 data/db < clojars.sql`
+3. Run the webapp: `lein run 8080 8701`
 
-4. Run the webapp: `java -jar clojars-web-*-standalone.jar 8080 8701`
-
-5. Now try hitting `http://localhost:8080/` in your web browser.
+4. Now try hitting `http://localhost:8080/` in your web browser.
 
 If you'd like to run it out of an editor/IDE environment you can
 probably eval a call to the `-main` function in
@@ -81,5 +79,6 @@ Mailing lists
 
 There's a public mailing list
 [clojars@googlegroups.com](http://groups.google.com/group/clojars) for
-general discussion.  There's also a separate maintainers list for
-people looking after the repository and server.
+general discussion.  There's also a
+[separate maintainers list](http://groups.google.com/group/clojars-maintainers)
+for people looking after the repository and server.

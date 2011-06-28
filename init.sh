@@ -24,16 +24,17 @@ fi
 
 # Clojars Web app
 if [ ! -r /home/clojars/prod ]; then
-    git clone git://github.com/ato/clojars-web /home/clojars/prod
+    git clone git://github.com/technomancy/clojars-web /home/clojars/prod
     cd /home/clojars/prod
+    git checkout vagrant
 
+    ln -s /home/clojars/data data
     touch data/authorized_keys
     ln -s /home/clojars/data/authorized_keys /home/clojars/.ssh/authorized_keys
-    ln -s /home/clojars/data data
     sqlite3 /home/clojars/data/db < clojars.sql
     chown -R clojars /home/clojars
 
-    sudo -u clojars lein uberjar
+    HOME=/home/clojars sudo -u clojars lein uberjar
 fi
 
 # Nailgun
@@ -41,7 +42,8 @@ if [ ! -r /home/clojars/nailgun ]; then
     svn co https://nailgun.svn.sourceforge.net/svnroot/nailgun/trunk/nailgun \
         /home/clojars/nailgun
     cd /home/clojars/nailgun
-    sudo -u clojars make
+    chown -R clojars .
+    sudo -u clojars -i make
     cp ng /usr/local/bin
 fi
 

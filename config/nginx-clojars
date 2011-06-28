@@ -1,0 +1,40 @@
+upstream clojars-web {
+  server localhost:8001 max_fails=3;
+  server localhost:8002 max_fails=3 backup;
+}
+
+server {
+  listen 80;
+  server_name clojars.org;
+  root   /home/clojars/prod/public;
+  access_log  /var/log/nginx/clojars.access.log;
+
+  location / {
+    # try static content first, then fall through to the webapp
+    try_files $uri @clojars_webapp;
+  }
+
+  location /repo {
+    root /home/clojars;
+    autoindex on;
+  }
+
+  location @clojars_webapp {
+    proxy_pass http://clojars-web;
+  }
+
+  ##
+  ## Linked repositories
+  ##
+
+  location /repo/org/clojure {
+    rewrite  ^/repo/(.*)$  http://build.clojure.org/releases/$1  permanent;
+    if ($uri ~ ".*-SNAPSHOT/.*") {
+      rewrite  ^/repo/(.*)$  http://build.clojure.org/snapshots/$1  permanent;
+    }
+  }
+
+  location /repo/org/xerial {
+    rewrite  ^/repo/(.*)$  http://www.xerial.org/maven/repository/artifact/$1  permanent;
+  }
+}

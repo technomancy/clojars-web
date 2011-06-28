@@ -26,6 +26,14 @@ If you'd like to run it out of an editor/IDE environment you can
 probably eval a call to the `-main` function in
 `src/clojars/core.clj`.
 
+Running in a VM
+---------------
+
+1. Install [http://www.virtualbox.org/wiki/Downloads](VirtualBox 4.x)
+2. Install [http://download.virtualbox.org/virtualbox/4.0.8/Oracle_VM_VirtualBox_Extension_Pack-4.0.8-71778.vbox-extpack](VirtualBox Extension Pack)
+3. <tt>gem install vagrant</tt> # install rubygems first if necessary
+4. <tt>vagrant up</tt>
+
 Test data
 ---------
 

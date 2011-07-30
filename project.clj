@@ -10,5 +10,8 @@
                  [ring/ring-jetty-adapter "0.3.1"]
                  [hiccup "0.3.0"]
                  [org.clojars.ato/nailgun "0.7.1"]
-                 [org.xerial/sqlite-jdbc "3.6.17"]])
+                 [org.xerial/sqlite-jdbc "3.6.17"]
+                 [org.apache.sshd/sshd-core "0.5.0"]
+                 [log4j "1.2.16"]
+                 [ch.qos.logback/logback-classic "0.9.24"]])
 

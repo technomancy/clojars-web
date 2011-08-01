@@ -1,12 +1,29 @@
 (ns clojars.scpII
-  (:use [clojure.java.io :only [copy file]])
-  (:require [clojure.string :as string])
+  (:use [clojure.java.io :only [copy file]]
+        [clojars.scp :only [*allowed-suffixes* *max-file-size* read-metadata
+                            jar-names]])
+  (:require [clojure.string :as string]
+            [clojars.maven   :as maven])
   (:import (org.apache.sshd SshServer)
-           (org.apache.sshd.server PublickeyAuthenticator FileSystemAware Command)
+           (org.apache.sshd.server PublickeyAuthenticator FileSystemAware
+                                   Command)
            (org.apache.sshd.server.command ScpCommand ScpCommandFactory)
            (org.apache.sshd.server.keyprovider SimpleGeneratorHostKeyProvider)
-           (java.io InputStreamReader BufferedReader IOException FilterInputStream)
+           (java.io InputStreamReader BufferedReader IOException
+                    FilterInputStream File)
+           (java.util UUID)
            (org.apache.commons.io.input BoundedInputStream)))
+
+(defmacro with-temp-files [[name & names] & body]
+  `(let [~name (File. ~(str "/tmp/" (UUID/randomUUID)))]
+     (try
+       ~(if (seq names)
+          `(with-open ~(vec names)
+             ~@body)
+          `(do ~@body))
+       ~(when-not (:keep (meta name))
+          `(finally
+            (doall (map #(.delete %) (reverse (file-seq ~name)))))))))
 
 (def pem-files "/Users/hiredman/Downloads/one.pem")
 
@@ -53,8 +70,7 @@
       nil)
     c))
 
-(defn write-file [in out header cmd]
-  (.info *log* (print-str `write-line in out header cmd))
+(defn write-file [in out header cmd upload-dir accepted-types]
   (when-not (.startsWith header "C")
     (throw
      (IOException.
@@ -62,14 +78,45 @@
   (let [perms (subs header 1 5)
         length (Long/parseLong (subs header 6 (.indexOf header (int \space) 6)))
         file-name (subs header (inc (.indexOf header (int \space) 6)))
-        out-file (file "/dev/null")
-        buffer (byte-array 1024)]
+        out-file (file upload-dir (str (UUID/randomUUID)))]
+    (when-not (some #(.endsWith file-name %) accepted-types)
+      (throw
+       (IllegalArgumentException.
+        (str "File type not allowed: " file-name))))
+    (when (> length *max-file-size*)
+      (throw
+       (IllegalArgumentException.
+        (str "File too large: " file-name " " length))))
     (send-ack out)
-    (.info *log* (pr-str [perms length file-name]))
     (copy (BoundedInputStream. in length) out-file)
     (send-ack out)
     (read-ack in false)
-    (.info *log* (str `copy "done"))))
+    {:file-name file-name
+     :file out-file
+     :permissions perms
+     :file-length length}))
+
+(defn deploy [username files]
+  (let [account username
+        act-group (str "org.clojars." account)
+        metadata (filter #(or (.endsWith (:file-name %) ".xml")
+                              (.endsWith (:file-name %) ".pom")) files)
+        jars (filter #(.endsWith (:file-name %) ".jar") files)
+        jarfiles (into {} (for [{:keys [file-name file]} files]
+                            [file-name file]))]
+    (doseq [metafile metadata
+            :when (not= (:file-name metafile) "maven-metadata.xml")
+            [model jarmap] (read-metadata metafile act-group)
+            :let [names (jar-names jarmap)]]
+      (if-let [jarfile (some jarfiles names)]
+        (do
+          (.println *err* (str "\nDeploying " (:group jarmap) "/"
+                               (:name jarmap) " " (:version jarmap)))
+          (maven/deploy-model jarfile model "file:///tmp"))
+        (throw (Exception. (str "You need to give me one of: " names)))))
+    (.println *err* (str "\nSuccess! Your jars are now available from "
+                         "http://clojars.org/"))
+    (.flush *err*)))
 
 (defn scp-command [command]
   (binding [*log* (org.slf4j.LoggerFactory/getLogger
@@ -98,8 +145,9 @@
         (destroy [_])
         Runnable
         (run [_]
-          (binding [*log* log]
-            (try
+          (with-temp-files [upload-dir]
+            (.mkdir upload-dir)
+            (binding [*log* log]
               (condp #(%2 %1) (:flags cmd)
                 :t (letfn [(k1 [{:keys [line dir? c] :as m}]
                              (cond
@@ -125,11 +173,17 @@
                                (.info *log* "DIRECTORY")
                                (do
                                  (.info *log* "FILE")
-                                 (write-file @in @out line cmd))))]
+                                 (write-file @in @out line cmd upload-dir
+                                             *allowed-suffixes*))))]
                      (send-ack @out)
-                     (while (not= ::end (k1 {:c (read-ack @in true)}))
-                       :bleh))))
-            (.onExit @callback 0 "GO AWAY")))))))
+                     (deploy
+                      (get (.getEnv @env) "USER")
+                      (loop [accum []]
+                        (let [r (k1 {:c (read-ack @in true)})]
+                          (if (= r ::end)
+                            accum
+                            (recur (conj accum r))))))))
+              (.onExit @callback 0 "GO AWAY"))))))))
 
 (defn launch-ssh []
   (let [sshd (doto (SshServer/setUpDefaultServer)

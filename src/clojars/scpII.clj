@@ -1,10 +1,12 @@
 (ns clojars.scpII
+  (:use [clojure.java.io :only [copy file]])
   (:require [clojure.string :as string])
   (:import (org.apache.sshd SshServer)
            (org.apache.sshd.server PublickeyAuthenticator FileSystemAware Command)
            (org.apache.sshd.server.command ScpCommand ScpCommandFactory)
            (org.apache.sshd.server.keyprovider SimpleGeneratorHostKeyProvider)
-           (java.io InputStreamReader BufferedReader)))
+           (java.io InputStreamReader BufferedReader IOException FilterInputStream)
+           (org.apache.commons.io.input BoundedInputStream)))
 
 (def pem-files "/Users/hiredman/Downloads/one.pem")
 
@@ -38,7 +40,7 @@
   (let [rdr (-> ins InputStreamReader. BufferedReader.)]
     (if-let [line (.readLine rdr)]
       line
-      (throw (java.io.IOException. "End of stream")))))
+      (throw (IOException. "End of stream")))))
 
 (defn read-ack [ins can-eof?]
   (let [c (.read ins)]
@@ -46,10 +48,28 @@
       -1 (when-not can-eof?
            (throw (java.io.EOFException.)))
       WARNING (.warn *log* (str "Received warning: " (read-line ins)))
-      ERROR (throw (java.io.IOException.
+      ERROR (throw (IOException.
                     (str "Received nack: " (read-line ins))))
       nil)
     c))
+
+(defn write-file [in out header cmd]
+  (.info *log* (print-str `write-line in out header cmd))
+  (when-not (.startsWith header "C")
+    (throw
+     (IOException.
+      (format "Expected a C message but got '%s'" header))))
+  (let [perms (subs header 1 5)
+        length (Long/parseLong (subs header 6 (.indexOf header (int \space) 6)))
+        file-name (subs header (inc (.indexOf header (int \space) 6)))
+        out-file (file "/dev/null")
+        buffer (byte-array 1024)]
+    (send-ack out)
+    (.info *log* (pr-str [perms length file-name]))
+    (copy (BoundedInputStream. in length) out-file)
+    (send-ack out)
+    (read-ack in false)
+    (.info *log* (str `copy "done"))))
 
 (defn scp-command [command]
   (binding [*log* (org.slf4j.LoggerFactory/getLogger
@@ -82,9 +102,8 @@
             (try
               (condp #(%2 %1) (:flags cmd)
                 :t (letfn [(k1 [{:keys [line dir? c] :as m}]
-                             (.info *log* (str `k1 " " (pr-str m) " " (char c)))
                              (cond
-                              (= -1 c) nil
+                              (= -1 c) ::end
                               (= (char c) \D) (k2 (assoc m
                                                     :dir? true))
                               (= (char c) \C) (k3 (assoc m
@@ -104,9 +123,12 @@
                              (.info *log* (str `k3 " " (pr-str m) " " (char c)))
                              (if (and dir? (:r (:flags cmd)))
                                (.info *log* "DIRECTORY")
-                               (.info *log* "FILE")))]
+                               (do
+                                 (.info *log* "FILE")
+                                 (write-file @in @out line cmd))))]
                      (send-ack @out)
-                     (k1 {:c (read-ack @in true)}))))
+                     (while (not= ::end (k1 {:c (read-ack @in true)}))
+                       :bleh))))
             (.onExit @callback 0 "GO AWAY")))))))
 
 (defn launch-ssh []

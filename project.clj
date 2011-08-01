@@ -13,5 +13,6 @@
                  [org.xerial/sqlite-jdbc "3.6.17"]
                  [org.apache.sshd/sshd-core "0.5.0"]
                  [log4j "1.2.16"]
-                 [ch.qos.logback/logback-classic "0.9.24"]])
+                 [ch.qos.logback/logback-classic "0.9.24"]
+                 [commons-io "2.0.1"]])
 

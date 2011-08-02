@@ -32,7 +32,7 @@ Running in a production-like environment (Linux VM)
 1. Install [VirtualBox 4](http://www.virtualbox.org/wiki/Downloads) and
 the [VirtualBox 4.1 Oracle VM VirtualBox Extension Pack](http://www.virtualbox.org/wiki/Downloads).
 
-2. Install vagrant by running: <tt>gem install vagrant</tt>. You may need to install rubygems first.
+2. Install [Vagrant](http://vagrantup.com) by running: <tt>gem install vagrant</tt>. You may need to install rubygems first.
 
 3. Run <tt>vagrant up</tt> and wait, it'll take a while.
 

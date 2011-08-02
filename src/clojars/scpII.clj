@@ -147,7 +147,8 @@
         (run [_]
           (with-temp-files [upload-dir]
             (.mkdir upload-dir)
-            (binding [*log* log]
+            (binding [*log* log
+                      *err* (java.io.PrintWriter. @err true)]
               (condp #(%2 %1) (:flags cmd)
                 :t (letfn [(k1 [{:keys [line dir? c] :as m}]
                              (cond

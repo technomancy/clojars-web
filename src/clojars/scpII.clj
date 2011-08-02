@@ -118,6 +118,48 @@
                          "http://clojars.org/"))
     (.flush *err*)))
 
+(defn run-scp [& {:keys [log err cmd in out env callback]}]
+  (with-temp-files [upload-dir]
+    (.mkdir upload-dir)
+    (binding [*log* log
+              *err* (java.io.PrintWriter. err true)]
+      (condp #(%2 %1) (:flags cmd)
+        :t (letfn [(k1 [{:keys [line dir? c] :as m}]
+                     (cond
+                      (= -1 c) ::end
+                      (= (char c) \D) (k2 (assoc m
+                                            :dir? true))
+                      (= (char c) \C) (k3 (assoc m
+                                            :line (str (char c)
+                                                       (read-line
+                                                        in))))
+                      (= (char c) \E)  (read-line in)
+                      :else (k3 m)))
+                   (k2 [{:keys [line dir? c] :as m}]
+                     (.info *log* (str `k2 " " (pr-str m) " " (char c)))
+                     (condp #(= (int %1) (int %2)) c
+                       \C (k3 (assoc m
+                                :line (str (char c) (read-line in))))
+                       \E (read-line in)
+                       :else (k3 m)))
+                   (k3 [{:keys [line dir? c] :as m}]
+                     (.info *log* (str `k3 " " (pr-str m) " " (char c)))
+                     (if (and dir? (:r (:flags cmd)))
+                       (.info *log* "DIRECTORY")
+                       (do
+                         (.info *log* "FILE")
+                         (write-file in out line cmd upload-dir
+                                     *allowed-suffixes*))))]
+             (send-ack out)
+             (deploy
+              (get (.getEnv env) "USER")
+              (loop [accum []]
+                (let [r (k1 {:c (read-ack in true)})]
+                  (if (= r ::end)
+                    accum
+                    (recur (conj accum r))))))))
+      (.onExit callback 0 "GO AWAY"))))
+
 (defn scp-command [command]
   (binding [*log* (org.slf4j.LoggerFactory/getLogger
                    (str 'clojars.scpII))]
@@ -145,46 +187,8 @@
         (destroy [_])
         Runnable
         (run [_]
-          (with-temp-files [upload-dir]
-            (.mkdir upload-dir)
-            (binding [*log* log
-                      *err* (java.io.PrintWriter. @err true)]
-              (condp #(%2 %1) (:flags cmd)
-                :t (letfn [(k1 [{:keys [line dir? c] :as m}]
-                             (cond
-                              (= -1 c) ::end
-                              (= (char c) \D) (k2 (assoc m
-                                                    :dir? true))
-                              (= (char c) \C) (k3 (assoc m
-                                                    :line (str (char c)
-                                                               (read-line
-                                                                @in))))
-                              (= (char c) \E)  (read-line @in)
-                              :else (k3 m)))
-                           (k2 [{:keys [line dir? c] :as m}]
-                             (.info *log* (str `k2 " " (pr-str m) " " (char c)))
-                             (condp #(= (int %1) (int %2)) c
-                               \C (k3 (assoc m
-                                        :line (str (char c) (read-line @in))))
-                               \E (read-line @in)
-                               :else (k3 m)))
-                           (k3 [{:keys [line dir? c] :as m}]
-                             (.info *log* (str `k3 " " (pr-str m) " " (char c)))
-                             (if (and dir? (:r (:flags cmd)))
-                               (.info *log* "DIRECTORY")
-                               (do
-                                 (.info *log* "FILE")
-                                 (write-file @in @out line cmd upload-dir
-                                             *allowed-suffixes*))))]
-                     (send-ack @out)
-                     (deploy
-                      (get (.getEnv @env) "USER")
-                      (loop [accum []]
-                        (let [r (k1 {:c (read-ack @in true)})]
-                          (if (= r ::end)
-                            accum
-                            (recur (conj accum r))))))))
-              (.onExit @callback 0 "GO AWAY"))))))))
+          (run-scp :log log :err @err :cmd cmd :in @in :out @out :env @env
+                   :callback @callback))))))
 
 (defn launch-ssh []
   (let [sshd (doto (SshServer/setUpDefaultServer)
@@ -192,7 +196,8 @@
                (.setPublickeyAuthenticator
                 (reify
                   PublickeyAuthenticator
-                  (authenticate [_ username key serssion]
+                  (authenticate [_ username key session]
+                    (println username key session)
                     true)))
                (.setCommandFactory
                 (proxy [ScpCommandFactory] []

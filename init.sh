@@ -43,8 +43,8 @@ if [ ! -r /home/clojars/nailgun ]; then
         /home/clojars/nailgun
     cd /home/clojars/nailgun
     chown -R clojars .
-    sudo -u clojars -i make
-    cp ng /usr/local/bin
+    sudo -u clojars make
+    sudo cp ng /usr/local/bin
 fi
 
 # TODO: Nexus indexer, crontab

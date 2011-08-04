@@ -33,6 +33,17 @@ Running in a production-like environment (Linux VM)
 2. Install [Vagrant](http://vagrantup.com) by running: <tt>gem install vagrant</tt>. You may need to install [rubygems](http://rubygems.org) first.
 3. Run <tt>vagrant up</tt> and wait, it'll take a while.
 
+Once the virtual machine is up and running you can access the web app at
+[localhost:8088](http://locahost:8088). To ssh into it you can just run
+`vagrant ssh`. To push new jars, ssh is forwarded from the local port 2222 so
+the command is:
+`scp -P 2222 foobar-0.0.1.jar pom.xml clojars@localhost:`. You can also ssh
+directly to port 2222 to the vagrant user, `ssh -p 2222 vagrant:localhost`,
+with the password "vagrant".
+
+When something goes wrong, inside the virtual machine, you can find the logs in
+`/var/log/clojar`.
+
 Test data
 ---------
 

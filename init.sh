@@ -3,7 +3,7 @@
 apt-get update
 apt-get install -y \
     git-core openjdk-6-jdk tmux sqlite3 subversion nginx balance cronolog \
-    emacs23 tree unzip rlwrap tmux curl
+    emacs23 tree unzip rlwrap tmux curl nailgun
 
 # Leiningen
 if [ ! -r /usr/local/bin/lein ]; then
@@ -38,14 +38,8 @@ if [ ! -r /home/clojars/prod ]; then
 fi
 
 # Nailgun
-if [ ! -r /home/clojars/nailgun ]; then
-    svn co https://nailgun.svn.sourceforge.net/svnroot/nailgun/trunk/nailgun \
-        /home/clojars/nailgun
-    cd /home/clojars/nailgun
-    chown -R clojars .
-    sudo -u clojars make
-    sudo cp ng /usr/local/bin
-fi
+# TODO: fix whatever is running nailgun to run the correct one.
+sudo ln -s /usr/bin/ng-nailgun /usr/local/bin/ng
 
 # TODO: Nexus indexer, crontab
 

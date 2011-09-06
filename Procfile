@@ -1,1 +1,2 @@
-web: lein run -m clojars.core
+web: lein run -m clojars.web
+scp: lein run -m clojars.scp

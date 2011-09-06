@@ -13,6 +13,7 @@
         [ring.middleware.session :only [wrap-session]]
         [ring.middleware.file :only [wrap-file]]
         [ring.util.response :only [redirect]]
+        [ring.adapter.jetty :only [run-jetty]]
         [compojure.core :only [defroutes GET POST ANY]])
   (:require [clojure.contrib.sql :as sql]))
 
@@ -104,6 +105,13 @@
        wrap-session
        (wrap-file "public")
        db-middleware))
+
+(defn -main [& [http-port]]
+  (let [port (or http-port (System/getenv "PORT") "8080")]
+    (run-jetty clojars-app {:port (Integer/parseInt port) :join? false})))
+
+;; (defonce server (run-jetty #'clojars-app {:port 8080 :join? false}))
+;; (.stop server)
 
 (comment
   (require 'swank.swank)

@@ -1,6 +1,7 @@
 (ns clojars.scp
   (:refer-clojure :exclude [read-line])
-  (:use [clojure.java.io :only [copy file]])
+  (:use [clojure.java.io :only [copy file]]
+        [clojars.config :only [config]])
   (:require [clojure.string :as string]
             [clojars.maven   :as maven])
   (:import (org.apache.sshd SshServer)
@@ -225,5 +226,6 @@
                 (SimpleGeneratorHostKeyProvider. pem-files)))]
     (doto sshd .start)))
 
-
-
+(defn -main [& [scp-port]]
+  (let [port (or scp-port (System/getenv "PORT") "3333")]
+    (launch-ssh (Integer/parseInt port))))

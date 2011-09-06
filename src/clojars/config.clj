@@ -20,4 +20,4 @@
                :subprotocol "postgresql"}
               (database-resource))
    :key-file "data/authorized_keys"
-   :repo "repo"})
+   :repo (str (System/getProperty "user.dir") "/data/repo")})

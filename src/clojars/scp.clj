@@ -1,79 +1,21 @@
 (ns clojars.scp
-  (:import (java.io InputStream IOException File OutputStream
-                    FileOutputStream)
-           com.martiansoftware.nailgun.NGContext)
-  (:use [clojars.config :only [config]])
-  (:require [clojars.maven :as maven]
-            [clojars.db :as db])
-  (:gen-class
-   :methods [#^{:static true}
-             [nailMain [com.martiansoftware.nailgun.NGContext] void]]))
+  (:refer-clojure :exclude [read-line])
+  (:use [clojure.java.io :only [copy file]])
+  (:require [clojure.string :as string]
+            [clojars.maven   :as maven])
+  (:import (org.apache.sshd SshServer)
+           (org.apache.sshd.server PublickeyAuthenticator FileSystemAware
+                                   Command)
+           (org.apache.sshd.server.command ScpCommand ScpCommandFactory)
+           (org.apache.sshd.server.keyprovider SimpleGeneratorHostKeyProvider)
+           (java.io InputStreamReader BufferedReader IOException
+                    FilterInputStream File)
+           (java.util UUID)
+           (org.apache.commons.io.input BoundedInputStream)))
 
-(def *max-line-size* 4096)
-(def *max-file-size* 20485760)
-(def *allowed-suffixes* #{"pom" "xml" "jar" "sha1" "md5"})
+(def max-file-size 20485760)
 
-(defn safe-read-line
-  ([#^InputStream stream #^StringBuilder builder]
-     (when (> (.length builder) *max-line-size*)
-       (throw (IOException. "Line too long")))
-
-     (let [c (char (.read stream))]
-       (if (= c \newline)
-         (str builder)
-         (do
-           (.append builder c)
-           (recur stream builder)))))
-  ([stream] (safe-read-line stream (StringBuilder.))))
-
-(defn send-okay [#^NGContext ctx]
-  (doto (.out ctx)
-    (.print "\0")
-    (.flush)))
-
-(defn copy-limit
-  "Copies at most n bytes from in to out.  Returns the number of bytes
-   copied."
-  [#^InputStream in #^OutputStream out n]
-  (let [buffer (make-array Byte/TYPE 4096)]
-    (loop [bytes 0]
-      (if (< bytes n)
-        (let [size (.read in buffer 0 (min 4096 (- n bytes)))]
-          (if (pos? size)
-            (do
-              (.write out buffer 0 size)
-              (recur (+ bytes size)))
-            bytes))
-        bytes))))
-
-(defn scp-copy [#^NGContext ctx]
-  (let [line #^String (safe-read-line (.in ctx))
-        [mode size path] (.split line " " 3)
-        size (Integer/parseInt size)
-        fn (File. #^String path)
-        suffix (last (.split (.getName fn) "\\."))]
-
-    (when (> size *max-file-size*)
-      (throw (IOException. (str "Upload too large.  Maximum size is "
-                                *max-file-size* " bytes"))))
-
-    (when-not (*allowed-suffixes* suffix)
-      (throw (IOException. (str "." suffix
-                                " files are not supported."))))
-
-    (let [f (File/createTempFile "clojars-upload" (str "." suffix))]
-      (.deleteOnExit f)
-      (send-okay ctx)
-      (with-open [fos (FileOutputStream. f)]
-        (let [bytes (copy-limit (.in ctx) fos size)]
-          (if (>= bytes size)
-            {:name (.getName fn), :file f, :size size, :suffix suffix
-             :mode mode}
-            (throw (IOException. (str "Upload truncated.  Expected "
-                                      size " bytes but got " bytes)))))))))
-
-(defmacro printerr [& strs]
-  `(.println (.err ~'ctx) (str ~@(interleave strs (repeat " ")))))
+(def allowed-suffixes #{"pom" "xml" "jar" "sha1" "md5"})
 
 (defn read-metadata [f default-group]
   (let [model (maven/read-pom (:file f))
@@ -86,73 +28,202 @@
   [(str (:name jarmap) "-" (:version jarmap) ".jar")
    (str (:name jarmap) ".jar")])
 
-(defn finish-deploy [#^NGContext ctx, files]
-  (let [account (first (.getArgs ctx))
-        act-group (str "org.clojars." account)
-        metadata (filter #(#{"xml" "pom"} (:suffix %)) files)
-        jars     (filter #(#{"jar"}       (:suffix %)) files)
-        jarfiles (into {} (map (juxt :name :file) jars))]
+(defmacro with-temp-files [[name & names] & body]
+  `(let [~name (File. ~(str "/tmp/" (UUID/randomUUID)))]
+     (try
+       ~(if (seq names)
+          `(with-open ~(vec names)
+             ~@body)
+          `(do ~@body))
+       ~(when-not (:keep (meta name))
+          `(finally
+            (doall (map #(.delete %) (reverse (file-seq ~name)))))))))
 
+(def pem-files "/Users/hiredman/Downloads/one.pem")
+
+(defn preprocess-command [command]
+  (loop [[x & xs] (rest (.split command " ")) accum []]
+    (cond
+     (not (.startsWith (.trim x) "-"))
+     {:flags accum :files (string/join \space (conj xs x))}
+     (= (.trim x) "--")
+     (recur xs accum)
+     :else
+     (recur xs (conj accum x)))))
+
+(defn process-command [{:keys [flags files]}]
+  {:files files
+   :flags (->> (for [f flags]
+                 [(keyword (apply str (drop 1 f))) true])
+               (into {}))})
+
+(def OK 0)
+(def WARNING 1)
+(def ERROR 2)
+
+(def *log*)
+
+(defn send-ack [outs]
+  (.write outs OK)
+  (.flush outs))
+
+(defn read-line [ins]
+  (let [rdr (-> ins InputStreamReader. BufferedReader.)]
+    (if-let [line (.readLine rdr)]
+      line
+      (throw (IOException. "End of stream")))))
+
+(defn read-ack [ins can-eof?]
+  (let [c (.read ins)]
+    (condp = c
+      -1 (when-not can-eof?
+           (throw (java.io.EOFException.)))
+      WARNING (.warn *log* (str "Received warning: " (read-line ins)))
+      ERROR (throw (IOException.
+                    (str "Received nack: " (read-line ins))))
+      nil)
+    c))
+
+(defn write-file [in out header cmd upload-dir accepted-types]
+  (when-not (.startsWith header "C")
+    (throw
+     (IOException.
+      (format "Expected a C message but got '%s'" header))))
+  (let [perms (subs header 1 5)
+        length (Long/parseLong (subs header 6 (.indexOf header (int \space) 6)))
+        file-name (subs header (inc (.indexOf header (int \space) 6)))
+        out-file (file upload-dir (str (UUID/randomUUID)))]
+    (when-not (some #(.endsWith file-name %) accepted-types)
+      (throw
+       (IllegalArgumentException.
+        (str "File type not allowed: " file-name))))
+    (when (> length max-file-size)
+      (throw
+       (IllegalArgumentException.
+        (str "File too large: " file-name " " length))))
+    (send-ack out)
+    (copy (BoundedInputStream. in length) out-file)
+    (send-ack out)
+    (read-ack in false)
+    {:file-name file-name
+     :file out-file
+     :permissions perms
+     :file-length length}))
+
+(defn deploy [username files]
+  (let [account username
+        act-group (str "org.clojars." account)
+        metadata (filter #(or (.endsWith (:file-name %) ".xml")
+                              (.endsWith (:file-name %) ".pom")) files)
+        jars (filter #(.endsWith (:file-name %) ".jar") files)
+        jarfiles (into {} (map (juxt :file-name :file) files))]
     (doseq [metafile metadata
-            :when (not= (:name metafile) "maven-metadata.xml")
+            :when (not= (:file-name metafile) "maven-metadata.xml")
             [model jarmap] (read-metadata metafile act-group)
             :let [names (jar-names jarmap)]]
       (if-let [jarfile (some jarfiles names)]
         (do
           (.println *err* (str "\nDeploying " (:group jarmap) "/"
                                (:name jarmap) " " (:version jarmap)))
-          (db/add-jar account jarmap true)
-          (maven/deploy-model jarfile model
-                              (str "file://" (:repo config)))
-          (db/add-jar account jarmap))
+          (maven/deploy-model jarfile model (str "file://" (:repo config))))
         (throw (Exception. (str "You need to give me one of: " names)))))
     (.println *err* (str "\nSuccess! Your jars are now available from "
                          "http://clojars.org/"))
-    (.flush (.err ctx))))
+    (.flush *err*)))
 
-(defn nail [#^NGContext ctx]
-  (let [old-out System/out]
-    (try
-     (System/setOut (.err ctx))
-     (let [in (.in ctx)
-           err (.err ctx)
-           out (.out ctx)
-           account (first (.getArgs ctx))]
+(defn run-scp [& {:keys [log err cmd in out env callback]}]
+  (with-temp-files [upload-dir]
+    (.mkdir upload-dir)
+    (binding [*log* log
+              *err* (java.io.PrintWriter. err true)]
+      (condp #(%2 %1) (:flags cmd)
+        :t (letfn [(k1 [{:keys [line dir? c] :as m}]
+                     (cond
+                      (= -1 c) ::end
+                      (= (char c) \D) (k2 (assoc m
+                                            :dir? true))
+                      (= (char c) \C) (k3 (assoc m
+                                            :line (str (char c)
+                                                       (read-line
+                                                        in))))
+                      (= (char c) \E)  (read-line in)
+                      :else (k3 m)))
+                   (k2 [{:keys [line dir? c] :as m}]
+                     (.info *log* (str `k2 " " (pr-str m) " " (char c)))
+                     (condp #(= (int %1) (int %2)) c
+                       \C (k3 (assoc m
+                                :line (str (char c) (read-line in))))
+                       \E (read-line in)
+                       :else (k3 m)))
+                   (k3 [{:keys [line dir? c] :as m}]
+                     (.info *log* (str `k3 " " (pr-str m) " " (char c)))
+                     (if (and dir? (:r (:flags cmd)))
+                       (.info *log* "DIRECTORY")
+                       (do
+                         (.info *log* "FILE")
+                         (write-file in out line cmd upload-dir
+                                     allowed-suffixes))))]
+             (send-ack out)
+             (deploy
+              (get (.getEnv env) "USER")
+              (loop [accum []]
+                (let [r (k1 {:c (read-ack in true)})]
+                  (if (= r ::end)
+                    accum
+                    (recur (conj accum r))))))))
+      (.onExit callback 0 "GO AWAY"))))
 
-       (when-not account
-         (throw (Exception. "I don't know who you are!")))
+(defn scp-command [command]
+  (binding [*log* (org.slf4j.LoggerFactory/getLogger
+                   (str 'clojars.scp))]
+    (let [in (promise)
+          out (promise)
+          err (promise)
+          callback (promise)
+          thread (promise)
+          env (promise)
+          cmd (process-command command)
+          log *log*]
+      (reify
+        Command
+        (setInputStream [_ ins]
+          (deliver in ins))
+        (setOutputStream [_ outs]
+          (deliver out outs))
+        (setErrorStream [_ errs]
+          (deliver err errs))
+        (setExitCallback [_ callbacka]
+          (deliver callback callbacka))
+        (start [this enva]
+          (deliver env enva)
+          (deliver thread (doto (Thread. this (pr-str cmd)) .start)))
+        (destroy [_])
+        Runnable
+        (run [_]
+          (run-scp :log log :err @err :cmd cmd :in @in :out @out :env @env
+                   :callback @callback))))))
 
-       (doto (.err ctx)
-         (.println (str "Welcome to Clojars, " account "!"))
-         (.flush))
+(defn launch-ssh [port]
+  (let [sshd (doto (SshServer/setUpDefaultServer)
+               (.setPort port)
+               (.setPublickeyAuthenticator
+                (reify
+                  PublickeyAuthenticator
+                  (authenticate [_ username key session]
+                    (println username key session)
+                    true)))
+               (.setCommandFactory
+                (proxy [ScpCommandFactory] []
+                  (createCommand [command]
+                    (println command)
+                    (when-not (.startsWith (.trim command) "scp")
+                      (throw
+                       (IllegalArgumentException.
+                        "Unknown command, does not begin with 'scp'")))
+                    (scp-command (preprocess-command command)))))
+               (.setKeyPairProvider
+                (SimpleGeneratorHostKeyProvider. pem-files)))]
+    (doto sshd .start)))
 
-       (loop [files [], okay true]
-         (when (> (count files) 100)
-           (throw (IOException. "Too many files uploaded at once")))
 
-         (when okay
-           (send-okay ctx))
 
-         (let [cmd (.read in)]
-           (if (= -1 cmd)
-             (finish-deploy ctx files)
-             (let [cmd (char cmd)]
-               ;; TODO: use core.match
-               (condp = cmd
-                   (char 0)      (recur files false)
-                   \C            (recur (conj files (scp-copy ctx)) true)
-                   \D            (do (safe-read-line in) (recur files true))
-                   \T            (do (safe-read-line in) (recur files true))
-                   \E            (do (safe-read-line in) (recur files true))
-                   (throw (IOException. (str "Unknown scp command: '"
-                                             (int cmd) "'")))))))))
-
-     (catch Throwable t
-       ;; (.printStackTrace t *err*)
-       (.println (.err ctx) (str "Error: " (.getMessage t)))
-       (.flush (.err ctx))
-       (throw t))
-     (finally (System/setOut old-out)))))
-
-(defn -nailMain [context]
-  (nail context))

@@ -1,5 +1,4 @@
-{:db {:classname "org.sqlite.JDBC"
-      :subprotocol "sqlite"
-      :subname "data/db"}
- :key-file "data/auth_keys"
- :repo "repo"}
+(ns clojars.config
+  (:require [clojure.java.io :as io]))
+
+(def config (read-string (slurp (io/resource "config.clj"))))

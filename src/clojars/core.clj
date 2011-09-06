@@ -15,7 +15,7 @@
      (println "clojars-web: starting jetty on port" http-port)
      (run-jetty clojars-app {:port (Integer/parseInt http-port) :join? false})
      (println "clojars-web: starting SCP on 127.0.0.1 port " scp-port)
-     (launch-ssh scp-port)))
+     (launch-ssh (Integer/parseInt scp-port))))
 
 ;; (defonce server (run-jetty #'clojars-app {:port 8080 :join? false}))
 ;; (.stop server)

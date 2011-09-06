@@ -92,7 +92,7 @@
 
 (defn recent-jars []
   (with-query-results rs
-    [(str "SELECT DISTINCT ON (group_name, jar_name, created) * from jars "
+    [(str "SELECT DISTINCT ON (created, group_name, jar_name) * from jars "
           "ORDER BY created DESC LIMIT 5")]
     (vec rs)))
 
@@ -106,14 +106,13 @@
 
 (defn find-jar
   ([jarname]
-     (with-query-results rs [(str "select * from jars where "
-                                  "jar_name = ?") jarname]
+     (with-query-results rs ["select * from jars where jar_name = ?" jarname]
        (first rs)))
   ([group jarname]
-      (with-query-results rs [(str "select * from jars where group_name = ? and "
-                                   "jar_name = ? order by created desc "
-                                   "limit 1") group jarname]
-        (first rs))))
+     (with-query-results rs [(str "select * from jars where group_name = ? and "
+                                  "jar_name = ? order by created desc "
+                                  "limit 1") group jarname]
+       (first rs))))
 
 (defn add-user [email username password ssh-key]
   (let [salt (rand-string 16)]

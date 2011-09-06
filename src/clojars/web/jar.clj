@@ -26,7 +26,6 @@
                (tag "  <artifactId>") (:jar_name jar) (tag "</artifactId>\n")
                (tag "  <version>") (h (:version jar)) (tag "</version>\n")
                (tag "</dependency>")]]
-             [:p "Pushed by " (user-link (:username jar)) " on "
-              (java.util.Date. (:created jar))]
+             [:p "Pushed by " (user-link (:username jar)) " on " (:created jar)]
              (when-let [homepage (:homepage jar)]
                [:p (link-to homepage (str (h homepage)))])]))

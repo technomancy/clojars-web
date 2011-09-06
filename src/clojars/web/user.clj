@@ -47,8 +47,8 @@
       (conj-when (blank? password) "Password can't be blank")
       (conj-when (not= password confirm)
                  "Password and confirm password must match")
-      (conj-when (or (reserved-names user)    ; "I told them we already
-                     (and (not= account user) ; got one!"
+      (conj-when (or (reserved-names user)    ; I told them we already
+                     (and (not= account user) ; got one!
                           (find-user user))
                      (seq (group-members user)))
                  "Username is already taken")
@@ -65,7 +65,7 @@
     (register-form errors email user ssh-key)
     (do (add-user email user password ssh-key)
         (let [response (redirect "/")]
-          (assoc-in response [:session :account] (:user user))))))
+          (assoc-in response [:session :account] (:username user))))))
 
 (defn profile-form [account & [errors]]
   (let [user (find-user account)]
@@ -93,9 +93,9 @@
         (redirect "/profile"))))
 
 (defn show-user [account user]
-  (html-doc account (h (user :user))
-    [:h1 (h (user :user))]
+  (html-doc account (h (user :username))
+    [:h1 (h (user :username))]
     [:h2 "Jars"]
-    (unordered-list (map jar-link (jars-by-user (user :user))))
+    (unordered-list (map jar-link (jars-by-user (user :username))))
     [:h2 "Groups"]
-    (unordered-list (map group-link (find-groups (user :user))))))
+    (unordered-list (map group-link (find-groups (user :username))))))

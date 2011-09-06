@@ -91,10 +91,10 @@
       (try-account
        (show-jar account jar))
       :next))
-  (GET "/:user" {session :session {user "user"} :params}
-    (if-let [user (with-db (find-user user))]
+  (GET "/:username" {session :session {username "username"} :params}
+    (if-let [username (with-db (find-user username))]
       (try-account
-       (show-user account user))
+       (show-user account username))
       :next))
   (ANY "*" {session :session}
     (html-doc (session :account) "Page not found" (not-found-doc))))

@@ -25,5 +25,5 @@
 (defn login [{username "user" password "password"}]
   (if-let [user (auth-user username password)]
     (let [response (redirect "/")]
-      (assoc-in response [:session :account] (:user user)))
+      (assoc-in response [:session :account] (:username user)))
     (login-form "Incorrect username or password.")))

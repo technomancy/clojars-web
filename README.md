@@ -16,7 +16,7 @@ Running the webapp
 [SQLite3](http://www.sqlite.org/)
 (Debian: `apt-get install sqlite3`). 
 
-2. Create an initial sqlite database: `mkdir data; sqlite3 data/db < clojars.sql`
+2. createuser -s -P clojars; createdb -O clojars clojars; psql < clojars.sql
 
 3. Run the webapp: `lein run 8080 8701`
 

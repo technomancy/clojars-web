@@ -4,7 +4,7 @@
   (:require [clojure.string :as str]
             [clojure.java.io :as io])
   (:import java.security.MessageDigest
-           java.util.Date
+           java.sql.Timestamp
            java.io.File))
 
 (def ^{:private true} ssh-options
@@ -36,7 +36,7 @@
 (defn write-key-file [path]
   (locking (:key-file config)
    (let [new-file (File. (str path ".new"))]
-     (with-query-results rs ["select user, ssh_key from users"]
+     (with-query-results rs ["select username, ssh_key from users"]
        (with-open [f (io/writer new-file)]
          (doseq [{:keys [user ssh_key]} rs]
            (.write f (str "command=\"ng --nailgun-port 8700 clojars.scp " user
@@ -63,25 +63,28 @@
       (format "%040x" (java.math.BigInteger. 1 (.digest md))))))
 
 (defn find-user [username]
-  (with-query-results rs ["select * from users where user = ?" username]
+  (with-query-results rs ["select * from users where username = ?" username]
     (first rs)))
 
 (defn find-groups [username]
-  (with-query-results rs ["select * from groups where user = ?" username]
+  (with-query-results rs ["select * from groups where username = ?" username]
     (doall (map :name rs))))
 
 (defn group-members [group]
   (with-query-results rs ["select * from groups where name like ?" group]
-    (doall (map :user rs))))
+    (doall (map :username rs))))
 
-(defn auth-user [user pass]
+(defn auth-user [username pass]
   (with-query-results rs
-      ["select * from users where (user = ? or email = ?)" user user]
+      ["select * from users where (username = ? or email = ?)" username username]
     (first (filter #(= (:password %) (sha1 (:salt %) pass)) rs))))
 
-(defn jars-by-user [user]
-  (with-query-results rs [(str "select * from jars where user = ? "
-                               "group by group_name, jar_name") user]
+(defn jars-by-user [username]
+  (with-query-results rs [(str "SELECT DISTINCT ON (group_name, jar_name) * "
+                               "FROM jars WHERE username = ?")
+
+                          #_(str "select * from jars where username = ? "
+                               "group by group_name, jar_name") username]
     (vec rs)))
 
 (defn jars-by-group [group]
@@ -92,7 +95,8 @@
 
 (defn recent-jars []
   (with-query-results rs
-      [(str "select * from jars group by group_name, jar_name "
+    ["SELECT DISTINCT ON (group_name, jar_name) * from jars "
+     #_(str "select * from jars group by group_name, jars.jar_name "
             "order by created desc limit 5")]
     (vec rs)))
 
@@ -115,33 +119,34 @@
                                    "limit 1") group jarname]
         (first rs))))
 
-(defn add-user [email user password ssh-key]
+(defn add-user [email username password ssh-key]
   (let [salt (rand-string 16)]
     (insert-values
      :users
-     [:email :user :password :salt :ssh_key :created]
-     [email user (sha1 salt password) salt ssh-key (Date.)])
+     [:email :username :password :salt :ssh_key :created]
+     [email username (sha1 salt password) salt ssh-key
+      (Timestamp. (System/currentTimeMillis))])
     (insert-values
      :groups
-     [:name :user]
-     [(str "org.clojars." user) user])
+     [:name :username]
+     [(str "org.clojars." username) username])
     (write-key-file (:key-file config))))
 
-(defn update-user [account email user password ssh-key]
+(defn update-user [account email username password ssh-key]
   (let [salt (rand-string 16)]
    (update-values
-    :users ["user=?" account]
+    :users ["username=?" account]
     {:email email
-     :user user
+     :username username
      :salt salt
      :password (sha1 salt password)
      :ssh_key ssh-key})
    (write-key-file (:key-file config))))
 
-(defn add-member [group user]
+(defn add-member [group username]
   (insert-records :groups
                   {:name group
-                   :user user}))
+                   :username username}))
 
 (defn check-and-add-group [account group jar]
   (when-not (re-matches #"^[a-z0-9-_.]+$" group)
@@ -171,8 +176,8 @@
       {:group_name (:group jarmap)
        :jar_name   (:name jarmap)
        :version    (:version jarmap)
-       :user       account
-       :created    (Date.)
+       :username   account
+       :created    (Timestamp. (System/currentTimeMillis))
        :description (:description jarmap)
        :homepage   (:homepage jarmap)
        :authors    (str/join ", " (map #(.replace % "," "")
@@ -203,4 +208,4 @@
                       :description "An dog awesome and non-existent test jar."
                       :homepage "http://clojars.org/"
                       :authors ["Alex Osborne" "a little fish"]}))
-  (with-connection (:db config) (find-user "atotx")))
+  (with-connection (:db config) (find-user "atox")))

@@ -76,28 +76,24 @@
 
 (defn auth-user [username pass]
   (with-query-results rs
-      ["select * from users where (username = ? or email = ?)" username username]
+    ["select * from users where (username = ? or email = ?)" username username]
     (first (filter #(= (:password %) (sha1 (:salt %) pass)) rs))))
 
 (defn jars-by-user [username]
   (with-query-results rs [(str "SELECT DISTINCT ON (group_name, jar_name) * "
-                               "FROM jars WHERE username = ?")
-
-                          #_(str "select * from jars where username = ? "
-                               "group by group_name, jar_name") username]
+                               "FROM jars WHERE username = ?") username]
     (vec rs)))
 
 (defn jars-by-group [group]
-  (with-query-results rs [(str "select * from jars where "
-                               "group_name = ? group by jar_name")
+  (with-query-results rs [(str "SELECT DISTINCT ON (jar_name) * "
+                               "FROM jars WHERE group_name = ?")
                           group]
     (vec rs)))
 
 (defn recent-jars []
   (with-query-results rs
-    ["SELECT DISTINCT ON (group_name, jar_name) * from jars "
-     #_(str "select * from jars group by group_name, jars.jar_name "
-            "order by created desc limit 5")]
+    [(str "SELECT DISTINCT ON (group_name, jar_name, created) * from jars "
+          "ORDER BY created DESC LIMIT 5")]
     (vec rs)))
 
 (defn find-canon-jar [jarname]

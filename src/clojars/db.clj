@@ -22,7 +22,7 @@
     "webmaster" "profile" "dashboard" "settings" "options"
     "index" "files" "releases" "snapshots"})
 
-(def ^{:private true} chars
+(def ^{:private true} constituent-chars
   (->> [[\a \z] [\A \Z] [\0 \9]]
        (mapcat (fn [[x y]] (range (int x) (inc (int y)))))
        (map char)
@@ -31,7 +31,7 @@
 (defn rand-string
   "Generates a random string of [A-z0-9] of length n."
   [n]
-  (apply str (repeatedly n #(rand-nth chars))))
+  (apply str (repeatedly n #(rand-nth constituent-chars))))
 
 (defn write-key-file [path]
   (locking (:key-file config)

@@ -1,4 +1,5 @@
 (ns clojars.scpII
+  (:refer-clojure :exclude [read-line])
   (:use [clojure.java.io :only [copy file]]
         [clojars.scp :only [*allowed-suffixes* *max-file-size* read-metadata
                             jar-names]])
@@ -190,9 +191,9 @@
           (run-scp :log log :err @err :cmd cmd :in @in :out @out :env @env
                    :callback @callback))))))
 
-(defn launch-ssh []
+(defn launch-ssh [port]
   (let [sshd (doto (SshServer/setUpDefaultServer)
-               (.setPort 3333)
+               (.setPort port)
                (.setPublickeyAuthenticator
                 (reify
                   PublickeyAuthenticator

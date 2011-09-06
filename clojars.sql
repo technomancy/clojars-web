@@ -1,5 +1,5 @@
 -- as the psql user:
--- $ createuser -s -P clojars
+-- $ createuser -s -P clojars # default password should be typhoons
 -- $ createdb -O clojars clojars
 -- $ psql < clojars.sql
 

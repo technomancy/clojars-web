@@ -8,6 +8,9 @@
 
 (defn -main
   ([]
+     (-main (or (System/getenv "PORT") "8080")
+            (or (System/getenv "SCP_PORT") "3333")))
+  ([help]
      (.println System/err "Usage: clojars.core http-port nailgun-port")
      (.println System/err "   eg: clojars.core 8080 8701")
      (System/exit 1))

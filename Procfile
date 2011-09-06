@@ -1,1 +1,1 @@
-web: lein run -m clojars.core 8080 3333
+web: lein run -m clojars.core 8080

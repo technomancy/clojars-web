@@ -10,15 +10,14 @@
   ([]
      (-main (or (System/getenv "PORT") "8080")
             (or (System/getenv "SCP_PORT") "3333")))
-  ([help]
-     (.println System/err "Usage: clojars.core http-port nailgun-port")
-     (.println System/err "   eg: clojars.core 8080 8701")
-     (System/exit 1))
+  ([http-port]
+     (-main http-port false))
   ([http-port scp-port]
      (println "clojars-web: starting jetty on port" http-port)
      (run-jetty clojars-app {:port (Integer/parseInt http-port) :join? false})
-     (println "clojars-web: starting SCP on 127.0.0.1 port " scp-port)
-     (launch-ssh (Integer/parseInt scp-port))))
+     (when scp-port
+       (println "clojars-web: starting SCP on 127.0.0.1 port " scp-port)
+       (launch-ssh (Integer/parseInt scp-port)))))
 
 ;; (defonce server (run-jetty #'clojars-app {:port 8080 :join? false}))
 ;; (.stop server)

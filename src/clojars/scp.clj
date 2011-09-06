@@ -13,8 +13,6 @@
 (def *max-file-size* 20485760)
 (def *allowed-suffixes* #{"pom" "xml" "jar" "sha1" "md5"})
 
-(set! *warn-on-reflection* true)
-
 (defn safe-read-line
   ([#^InputStream stream #^StringBuilder builder]
      (when (> (.length builder) *max-line-size*)

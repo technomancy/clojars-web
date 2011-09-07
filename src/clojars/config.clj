@@ -20,4 +20,5 @@
                :subprotocol "postgresql"}
               (database-resource))
    :key-file "data/authorized_keys"
-   :repo (str (System/getProperty "user.dir") "/data/repo")})
+   :ssh-pem "data/key.pem"
+   :repo "file:///tmp/clojars-repo"})

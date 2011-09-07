@@ -40,8 +40,6 @@
           `(finally
             (doall (map #(.delete %) (reverse (file-seq ~name)))))))))
 
-(def pem-files "/Users/hiredman/Downloads/one.pem")
-
 (defn preprocess-command [command]
   (loop [[x & xs] (rest (.split command " ")) accum []]
     (cond
@@ -216,14 +214,13 @@
                (.setCommandFactory
                 (proxy [ScpCommandFactory] []
                   (createCommand [command]
-                    (println command)
                     (when-not (.startsWith (.trim command) "scp")
                       (throw
                        (IllegalArgumentException.
                         "Unknown command, does not begin with 'scp'")))
                     (scp-command (preprocess-command command)))))
                (.setKeyPairProvider
-                (SimpleGeneratorHostKeyProvider. pem-files)))]
+                (SimpleGeneratorHostKeyProvider. (:ssh-pem config))))]
     (doto sshd .start)))
 
 (defn -main [& [scp-port]]

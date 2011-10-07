@@ -1,6 +1,6 @@
 (defproject clojars-web "0.6.2"
   :main clojars.core
-  :dependencies [[org.clojure/clojure "1.2.0"]
+  :dependencies [[org.clojure/clojure "1.2.1"]
                  [org.clojure/clojure-contrib "1.2.0"]
                  [org.apache.maven/maven-ant-tasks "2.0.10"]
                  [org.apache.maven.wagon/wagon-provider-api "1.0"]

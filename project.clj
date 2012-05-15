@@ -10,9 +10,9 @@
                  [hiccup "0.3.8"]
                  [cheshire "2.2.2"]
                  [korma "0.3.0-beta10"]
+                 [postgresql "9.1-901-1.jdbc4"]
                  [org.mindrot/jbcrypt "0.3m"]
                  [org.clojars.ato/nailgun "0.7.1"]
-                 [org.xerial/sqlite-jdbc "3.6.17"]
                  [org.apache.commons/commons-email "1.2"]
                  [net.cgrand/regex "1.0.1"]
                  [clj-time "0.3.8"]
@@ -27,5 +27,3 @@
   :aot [clojars.scp]
   :main clojars.main
   :min-lein-version "2.0.0")
-
-

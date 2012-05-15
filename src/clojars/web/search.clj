@@ -44,7 +44,7 @@
             [:span.desc (h description)
              [:br]]))
         [:span.details
-         (user-link (:user jar))
+         (user-link (:username jar))
          " "
          (if-let [created (:created jar)]
            [:td (format-date created)])]])]))

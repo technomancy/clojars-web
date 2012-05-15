@@ -15,14 +15,17 @@ Running the webapp
 There are several ways to run Clojars depending on what you intend to do with
 it. Regardless of how you run it, you first need to do some setup:
 
-1. Install [Leiningen](http://github.com/technomancy/leiningen)
-   * Mac OS X Homebrew: `brew install leiningen`
+1. Install [Leiningen](http://leiningen.org)
 
-2. Install [SQLite3](http://www.sqlite.org/)
-   * Debian: `apt-get install sqlite3`
-   * Mac OS X Homebrew: `brew install sqlite`
+2. Install [PostgreSQL](http://postgresql.org/)
 
-3. Create an initial sqlite database: `mkdir data; sqlite3 data/dev_db < clojars.sql`
+3. Create the database:
+
+    $ initdb pg && postgres -D pg
+    $ createdb -D pg clojars # and/or clojars-dev/clojars-test
+
+You may need to add `/usr/lib/postgresql/$PG_VERSION/bin` to your
+`$PATH` first on Debian-based systems.
 
 To run the application using Leinigen 2:
 
@@ -58,9 +61,9 @@ Options may be read from a file using the `-f` switch, setting the
 `config.clj` on the classpath.  The config file should be a bare
 Clojure map:
 
-    {:db {:classname "org.sqlite.JDBC"
-	  :subprotocol "sqlite"
-	  :subname "data/dev_db"}
+    {:db {:subprotocol "postgresql"
+         :subname "clojars-test"
+         :classname "org.postgresql.Driver"}
      :key-file "data/dev_authorized_keys"
      :repo "data/dev_repo"
      :bcrypt-work-factor 12

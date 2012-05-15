@@ -15,3 +15,5 @@ target/
 
 /.lein-deps-sum
 /.lein-failures
+
+/pg

@@ -17,7 +17,7 @@
         ms (long 0)]
       (is (db/add-user email name password ssh-key))
       (are [x] (submap {:email email
-                        :user name
+                        :username name
                         :ssh_key ssh-key}
                        x)
            (db/find-user name)
@@ -47,7 +47,7 @@
         ;;TODO: What should be done about the key-file?
         (is (db/update-user name email2 name2 password2 ssh-key2))
         (are [x] (submap {:email email2
-                          :user name2
+                          :username name2
                           :ssh_key ssh-key2
                           :created ms}
                          x)
@@ -98,7 +98,7 @@
                 :version "1.0"
                 :homepage "http://clojars.org/"
                 :scm nil
-                :user "test-user"
+                :username "test-user"
                 :created ms
                 :group_name name
                 :authors "Alex Osborne, a little fish"
@@ -115,7 +115,7 @@
         jarmap {:name name :group name :version "1" }
         result {:jar_name name
                 :version "2"
-                :user "test-user"
+                :username "test-user"
                 :group_name name }]
     (binding [db/get-time (fn [] (java.sql.Timestamp. 0))]
       (is (db/add-jar "test-user" jarmap))
@@ -173,7 +173,7 @@
         jarmap {:name name :group name :version "1" }
         result {:jar_name name
                 :version "2"
-                :user "test-user"
+                :username "test-user"
                 :group_name name }]
     (binding [db/get-time (fn [] (java.sql.Timestamp. 0))]
       (is (db/add-jar "test-user" jarmap))
@@ -187,7 +187,7 @@
   (let [name "tester"
         jarmap {:name name :group name :version "1" }
         result {:jar_name name
-                :user "test-user"
+                :username "test-user"
                 :version "1"
                 :group_name name }]
     (db/add-member name "test-user")
@@ -271,7 +271,7 @@
                 :homepage "http://clojars.org/"
                 :authors ["Alex Osborne" "a little fish"]
                 :version "1"}
-        result {:user "test-user"
+        result {:username "test-user"
                 :jar_name name
                 :version "1"
                 :homepage "http://clojars.org/"

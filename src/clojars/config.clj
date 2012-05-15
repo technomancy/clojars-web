@@ -10,9 +10,9 @@
   {:port 8080
    :bind "0.0.0.0"
    :nailgun-bind "127.0.0.1"
-   :db {:classname "org.sqlite.JDBC"
-        :subprotocol "sqlite"
-        :subname "data/db"}
+   :db {:classname "org.postgresql.Driver"
+        :subprotocol "postgresql"
+        :subname "clojars"}
    :mail {:hostname "127.0.0.1"
           :ssl false
           :from "noreply@clojars.org"}
@@ -75,7 +75,7 @@
         :parse-fn #(Integer/parseInt %) :default (:port defaults)]
        ["-b" "--bind" "Address to bind to for web requests"
         :default (:address defaults)]
-       ["--db" "Database URL like sqlite:data/db"]
+       ["--db" "Database URL like postgres://localhost:5432/clojars"]
        ["--mail" "SMTP URL like smtps://user:pass@host:port?from=me@example.org"]
        ["--repo" "Path to store jar files in"]
        ["--key-file" "SSH authorized_keys file to write to"]

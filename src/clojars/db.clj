@@ -38,7 +38,7 @@
   (apply str (repeatedly n #(rand-nth constituent-chars))))
 
 (defn ^:dynamic get-time []
-  (Date.))
+  (java.sql.Timestamp. (System/currentTimeMillis)))
 
 (defn bcrypt [s]
   (BCrypt/hashpw s (BCrypt/gensalt (:bcrypt-work-factor config))))
@@ -52,8 +52,9 @@
   (locking (:key-file config)
     (let [new-file (File. (str path ".new"))]
       (with-open [f (io/writer new-file)]
-        (doseq [{:keys [user ssh_key]} (select users (fields :user :ssh_key))]
-          (.write f (str "command=\"ng --nailgun-port 8700 clojars.scp " user
+        (doseq [{:keys [username ssh_key]} (select users
+                                                   (fields :username :ssh_key))]
+          (.write f (str "command=\"ng --nailgun-port 8700 clojars.scp " username
                          "\"," ssh-options " "
                          (.replaceAll (.trim ssh_key)
                                       "[\n\r\0]" "")
@@ -61,17 +62,17 @@
       (.renameTo new-file (File. path)))))
 
 (defn find-user [username]
-  (first (select users (where {:user username}))))
+  (first (select users (where {:username username}))))
 
 (defn find-user-by-user-or-email [username-or-email]
-  (first (select users (where (or {:user username-or-email}
+  (first (select users (where (or {:username username-or-email}
                                   {:email username-or-email})))))
 
 (defn find-groupnames [username]
-  (map :name (select groups (fields :name) (where {:user username}))))
+  (map :name (select groups (fields :name) (where {:username username}))))
 
 (defn group-membernames [groupname]
-  (map :user (select groups (fields :user) (where {:name groupname}))))
+  (map :username (select groups (fields :username) (where {:name groupname}))))
 
 (defn authed? [plaintext user]
   (or (try (BCrypt/checkpw plaintext (:password user))
@@ -79,12 +80,12 @@
 
 (defn auth-user [username-or-email plaintext]
   (first (filter (partial authed? plaintext)
-                 (select users (where (or {:user username-or-email}
+                 (select users (where (or {:username username-or-email}
                                           {:email username-or-email}))))))
 
 (defn jars-by-username [username]
   (select jars
-          (where {:user username})
+          (where {:username username})
           (group :group_name :jar_name)))
 
 (defn jars-by-groupname [groupname]
@@ -96,14 +97,14 @@
   ([groupname jarname]
      (select jars
              (modifier "distinct")
-             (fields :version)
+             (fields :version :created)
              (where {:group_name groupname
                      :jar_name jarname})
              (order :created :desc)))
   ([groupname jarname num]
      (select jars
              (modifier "distinct")
-             (fields :version)
+             (fields :version :created)
              (where {:group_name groupname
                      :jar_name jarname})
              (order :created :desc)
@@ -118,7 +119,7 @@
 
 (defn recent-jars []
   (select jars
-          (group :group_name :jar_name)
+          (group :group_name :jar_name :id)
           (order :created :desc)
           (limit 5)))
 
@@ -147,7 +148,7 @@
 (defn add-user [email username password ssh-key]
   (insert users
           (values {:email email
-                   :user username
+                   :username username
                    :password (bcrypt password)
                    :ssh_key ssh-key
                    :created (get-time)
@@ -155,23 +156,23 @@
                    :salt ""}))
   (insert groups
           (values {:name (str "org.clojars." username)
-                   :user username}))
+                   :username username}))
   (write-key-file (:key-file config)))
 
 (defn update-user [account email username password ssh-key]
   (update users
           (set-fields {:email email
-                       :user username
+                       :username username
                        :salt ""
                        :password (bcrypt password)
                        :ssh_key ssh-key})
-          (where {:user account}))
+          (where {:username account}))
   (write-key-file (:key-file config)))
 
 (defn add-member [groupname username]
   (insert groups
           (values {:name groupname
-                   :user username})))
+                   :username username})))
 
 (defn check-and-add-group [account groupname]
   (when-not (re-matches #"^[a-z0-9-_.]+$" groupname)
@@ -196,7 +197,7 @@
           (values {:group_name group
                    :jar_name   name
                    :version    version
-                   :user       account
+                   :username   account
                    :created    (get-time)
                    :description description
                    :homepage   homepage
@@ -206,7 +207,7 @@
 (defn update-jar [account {:keys [group name version
                                   description homepage authors]}]
   (update jars
-          (set-fields {:user       account
+          (set-fields {:username   account
                        :created    (get-time)
                        :description description
                        :homepage   homepage

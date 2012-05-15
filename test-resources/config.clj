@@ -1,6 +1,6 @@
-{:db {:classname "org.sqlite.JDBC"
-      :subprotocol "sqlite"
-      :subname "data/test_db"}
+{:db {:subprotocol "postgresql"
+      :subname "clojars-test"
+      :classname "org.postgresql.Driver"}
  :key-file "data/test_authorized_keys"
  :repo "data/test_repo"
  :bcrypt-work-factor 12

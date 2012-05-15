@@ -92,12 +92,12 @@
         (redirect "/profile"))))
 
 (defn show-user [account user]
-  (html-doc account (h (user :user))
-    [:h1 (h (user :user))]
+  (html-doc account (h (user :username))
+    [:h1 (h (user :username))]
     [:h2 "Jars"]
-    (unordered-list (map jar-link (jars-by-username (user :user))))
+    (unordered-list (map jar-link (jars-by-username (user :username))))
     [:h2 "Groups"]
-    (unordered-list (map group-link (find-groupnames (user :user))))))
+    (unordered-list (map group-link (find-groupnames (user :username))))))
 
 (defn forgot-password-form []
   (html-doc nil "Forgot password?"
@@ -129,7 +129,8 @@
 (defn forgot-password [{:keys [email-or-username]}]
   (when-let [user (find-user-by-user-or-email email-or-username)]
     (let [new-password (rand-string 15)]
-      (update-user (user :user) (user :email) (user :user) new-password (user :ssh_key))
+      (update-user (user :username) (user :email) (user :username)
+                   new-password (user :ssh_key))
       (send-mail (user :email)
         "Password reset for Clojars"
         (str "Hello,\n\nYour new password for Clojars is: " new-password "\n\nKeep it safe this time."))))

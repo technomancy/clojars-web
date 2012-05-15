@@ -49,7 +49,7 @@
         (are [x] (submap {:email email2
                           :username name2
                           :ssh_key ssh-key2
-                          :created ms}
+                          :created (java.sql.Timestamp. ms)}
                          x)
              (db/find-user name2)
              (db/find-user-by-user-or-email name2)
@@ -99,7 +99,7 @@
                 :homepage "http://clojars.org/"
                 :scm nil
                 :username "test-user"
-                :created ms
+                :created (java.sql.Timestamp. ms)
                 :group_name name
                 :authors "Alex Osborne, a little fish"
                 :description "An dog awesome and non-existent test jar."}]
@@ -304,3 +304,5 @@
 
 ;; TODO: search tests?
 ;; TODO: recent-versions
+;; TODO: jars-by-username w/ 2 jars with same group_name, jar_name, created
+;; TODO: recent-jars using MAX(version) w/ -SNAPSHOT, -beta1, -beta10, etc

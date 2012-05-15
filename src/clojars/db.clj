@@ -84,31 +84,16 @@
                                           {:email username-or-email}))))))
 
 (defn jars-by-username [username]
-  (select jars
-          (where {:username username})
-          (group :group_name :jar_name)))
+    (exec-raw ["select J.* from jars J inner join (select group_name, jar_name, MAX(created) max from jars where username = ? group by group_name, jar_name ) T on J.group_name = T.group_name and J.jar_name = T.jar_name and J.created = T.max order by J.created" [username]] :results))
 
 (defn jars-by-groupname [groupname]
-  (select jars
-          (where {:group_name groupname})
-          (group :jar_name)))
+  (exec-raw ["select J.* from jars J inner join (select group_name, jar_name, MAX(created) max from jars where group_name = ? group by group_name, jar_name ) T on J.group_name = T.group_name and J.jar_name = T.jar_name and J.created = T.max order by J.created" [groupname]] :results))
 
 (defn recent-versions
   ([groupname jarname]
-     (select jars
-             (modifier "distinct")
-             (fields :version :created)
-             (where {:group_name groupname
-                     :jar_name jarname})
-             (order :created :desc)))
+     (exec-raw ["select group_name, jar_name, MAX(created) created, version from jars where group_name = ? and jar_name = ? group by group_name, jar_name, version order by created desc" [groupname jarname]] :results))
   ([groupname jarname num]
-     (select jars
-             (modifier "distinct")
-             (fields :version :created)
-             (where {:group_name groupname
-                     :jar_name jarname})
-             (order :created :desc)
-             (limit num))))
+     (exec-raw ["select group_name, jar_name, MAX(created) created, version from jars where group_name = ? and jar_name = ? group by group_name, jar_name, version order by created desc limit ?" [groupname jarname num]] :results)))
 
 (defn count-versions [groupname jarname]
   (-> (exec-raw [(str "select count(distinct version) count from jars"
@@ -118,10 +103,7 @@
       :count))
 
 (defn recent-jars []
-  (select jars
-          (group :group_name :jar_name :id)
-          (order :created :desc)
-          (limit 5)))
+  (exec-raw ["select J.* from jars J inner join (select group_name, jar_name, MAX(created) max, MAX(version) v2 from jars group by group_name, jar_name order by max desc limit 5) T on J.group_name = T.group_name and J.jar_name = T.jar_name and J.created = T.max and J.version = T.v2 order by J.created desc"] :results))
 
 (defn find-jar
   ([groupname jarname]

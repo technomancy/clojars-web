@@ -1,9 +1,9 @@
 (ns clojars.web
   (:require [clojars.db :refer [group-membernames find-user add-member
-                                find-jar recent-versions count-versions
-                                find-user-by-user-or-email]]
+                                find-jar recent-versions count-versions]]
             [clojars.config :refer [config]]
-            [clojars.auth :refer [with-account try-account require-authorization]]
+            [clojars.auth :refer [with-account try-account require-authorization
+                                  credentials]]
             [clojars.repo :as repo]
             [clojars.friend.registration :as registration]
             [clojars.web.dashboard :refer [dashboard index-page]]
@@ -23,7 +23,6 @@
             [compojure.handler :refer [site]]
             [compojure.route :refer [not-found]]
             [cemerick.friend :as friend]
-            [cemerick.friend.credentials :as creds]
             [cemerick.friend.workflows :as workflows]
             [clojure.java.io :as io]
             [clojure.string :as string]))
@@ -153,12 +152,7 @@
   (context "/repo" request
            (-> repo/routes
                (friend/authenticate
-                {:credential-fn
-                 (partial creds/bcrypt-credential-fn
-                          (fn [id]
-                            (when-let [{:keys [user password]}
-                                       (find-user-by-user-or-email id)]
-                              {:username user :password password})))
+                {:credential-fn credentials
                  :workflows [(workflows/http-basic :realm "clojars")]
                  :unauthorized-handler (partial workflows/http-basic-deny "clojars")})
                (repo/wrap-file (:repo config)))))
@@ -167,12 +161,7 @@
   (site
    (-> main-routes
        (friend/authenticate
-        {:credential-fn
-         (partial creds/bcrypt-credential-fn
-                  (fn [id]
-                    (when-let [{:keys [user password]}
-                               (find-user-by-user-or-email id)]
-                      {:username user :password password})))
+        {:credential-fn credentials
          :workflows [(workflows/interactive-form)
                      registration/workflow]
          :login-uri "/login"

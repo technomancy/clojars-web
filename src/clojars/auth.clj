@@ -1,6 +1,13 @@
 (ns clojars.auth
   (:require [cemerick.friend :as friend]
-            [clojars.db :refer [group-membernames]]))
+            [cemerick.friend.credentials :as creds]
+            [clojars.db :refer [group-membernames find-user-by-user-or-email]]))
+
+(def credentials
+  (partial creds/bcrypt-credential-fn
+           (fn [id]
+             (when-let [user (find-user-by-user-or-email id)]
+               (select-keys user [:username :password])))))
 
 (defmacro with-account [body]
   `(friend/authenticated (try-account ~body)))

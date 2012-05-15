@@ -5,7 +5,7 @@ create table users
         salt TEXT NOT NULL,
         email TEXT NOT NULL,
         ssh_key TEXT NOT NULL,
-        created DATE NOT NULL);
+        created TIMESTAMP NOT NULL);
 
 create table jars
        (id SERIAL PRIMARY KEY,
@@ -13,7 +13,7 @@ create table jars
         jar_name TEXT NOT NULL,
         version TEXT NOT NULL,
         username TEXT NOT NULL,
-        created DATE NOT NULL,
+        created TIMESTAMP NOT NULL,
         description TEXT,
         homepage TEXT,
         scm TEXT,

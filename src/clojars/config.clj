@@ -2,9 +2,8 @@
   (:require [clojure.tools.cli :refer [cli]]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [ring.util.codec :as codec]))
-
-(def config (when-not *compile-files* (read-string (slurp (io/resource "config.clj")))))
+            [ring.util.codec :as codec]
+            [korma.db]))
 
 (def default-config
   {:port 8080
@@ -102,6 +101,8 @@
                (merge env-opts arg-opts))]
     [opts args banner]))
 
+(def config (when-not *compile-files* (parse-resource "config.clj")))
+
 (defn configure [args]
   (let [[options args banner] (parse-config args)]
     (when (:help options)
@@ -115,4 +116,11 @@
       (println "Some options can be set using these environment variables:")
       (println (str/join " " (map first env-vars)))
       (System/exit 0))
-    (alter-var-root #'config (fn [_] options))))
+    (alter-var-root #'config (fn [_] options))
+
+    ;; TODO: this is gross because Korma breaks when the DB connection
+    ;; parameter is a string; see https://github.com/ibdknox/Korma/issues/62
+    (korma.db/default-connection (:db config))
+    (korma.config/merge-defaults {:delimiters ["\"" "\""]
+                                  :naming {:fields identity
+                                           :keys identity}})))

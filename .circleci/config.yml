@@ -8,18 +8,17 @@ jobs:
     working_directory: ~/clojars
     steps:
       - checkout
-      - run: sudo mv ~/clojars/bin/lein /usr/local/bin/lein
       - restore_cache:
           key: {{ checksum "project.clj" }}
       # Add test2junit to your project.clj and you can skip this section
       - run: mkdir -p ~/.lein && echo '{:user {:plugins [[test2junit "1.2.2"]]}}' > ~/.lein/profiles.clj
-      - run: lein deps
+      - run: bin/lein deps
       - save_cache:
           paths:
             - $HOME/.m2
             - $HOME/.lein
           key: {{ checksum "project.clj" }}
-      - run: lein do run -m user/migrate, test2junit, uberjar
+      - run: bin/lein do run -m user/migrate, test2junit, uberjar
       - store_test_results:
           path: test2junit/xml/user.xml
       - run: mv target/uberjar/clojars-web-*-standalone.jar clojars-uberjar.jar

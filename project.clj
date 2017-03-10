@@ -58,7 +58,8 @@
                  [clj-http "3.3.0"
                   :exclusions [commons-io]]
                  [aero "1.0.1"]]
-  :plugins [[supersport "1"]]
+  :plugins [[supersport "1"]
+            [test2junit "1.2.2" :exclusions [org.clojure/clojure]]]
   :main ^:skip-aot clojars.main
   :target-path "target/%s/"
   :release-tasks [["vcs" "assert-committed"]

@@ -20,3 +20,6 @@ pom.xml
 /.lein-failures
 /.nrepl-port
 /local-resources
+
+/test2junit
+/build.xml

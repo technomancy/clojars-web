@@ -9,7 +9,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: {{ checksum "project.clj" }}
+          key: << checksum "project.clj" >>
       # Add test2junit to your project.clj and you can skip this section
       - run: mkdir -p ~/.lein && echo '{:user {:plugins [[test2junit "1.2.2"]]}}' > ~/.lein/profiles.clj
       - run: bin/lein deps
@@ -17,7 +17,7 @@ jobs:
           paths:
             - $HOME/.m2
             - $HOME/.lein
-          key: {{ checksum "project.clj" }}
+          key: << checksum "project.clj" >>
       - run: bin/lein do run -m user/migrate, test2junit, uberjar
       - store_test_results:
           path: test2junit/xml/user.xml
